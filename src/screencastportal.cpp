@@ -65,6 +65,34 @@ static base::dbus::Message permissionsCall(base::dbus::Connection *bus, const st
                               "org.cutefish.Services.Permissions", method);
 }
 
+VariantMap screenCastSourceOptions(uint32_t types, const std::vector<CaptureOutput> &outputs,
+                                   const std::vector<CaptureToplevel> &toplevels)
+{
+    std::vector<VariantMap> windows;
+    if (types & sourceWindow) {
+        for (const auto &toplevel : toplevels) {
+            windows.push_back({{"identifier", Variant(toplevel.identifier)},
+                               {"title", Variant(toplevel.title)},
+                               {"app_id", Variant(toplevel.appId)}});
+        }
+    }
+    std::vector<VariantMap> monitors;
+    for (const auto &output : outputs) {
+        monitors.push_back({{"name", Variant(output.name)},
+                            {"description", Variant(output.description)},
+                            {"x", Variant(int32_t(output.logicalPosition.x()))},
+                            {"y", Variant(int32_t(output.logicalPosition.y()))},
+                            {"width", Variant(int32_t(output.logicalSize.width()))},
+                            {"height", Variant(int32_t(output.logicalSize.height()))}});
+    }
+    VariantMap options{{"types", Variant(types)}};
+    if (types & sourceMonitor)
+        options["monitors"] = base::dbus::Type<std::vector<VariantMap>>::toVariant(monitors);
+    if (types & sourceWindow)
+        options["windows"] = base::dbus::Type<std::vector<VariantMap>>::toVariant(windows);
+    return options;
+}
+
 class ScreenCastSession
 {
 public:
@@ -189,29 +217,8 @@ public:
             startStreams(targets, session->persistMode);
             return;
         }
-        std::vector<Variant> windows;
-        if (session->types & sourceWindow) {
-            for (const auto &toplevel : wayland->toplevels()) {
-                windows.push_back(Variant(VariantMap{{"identifier", Variant(toplevel.identifier)},
-                                                     {"title", Variant(toplevel.title)},
-                                                     {"app_id", Variant(toplevel.appId)}}));
-            }
-        }
-        std::vector<Variant> monitors;
-        for (const auto &output : outputs) {
-            monitors.push_back(Variant(VariantMap{{"name", Variant(output.name)},
-                                                  {"description", Variant(output.description)},
-                                                  {"x", Variant(int32_t(output.logicalPosition.x()))},
-                                                  {"y", Variant(int32_t(output.logicalPosition.y()))},
-                                                  {"width", Variant(int32_t(output.logicalSize.width()))},
-                                                  {"height", Variant(int32_t(output.logicalSize.height()))}}));
-        }
         base::dbus::Message prompt = permissionsCall(bus, "Prompt");
-        VariantMap options{{"types", Variant(session->types)}};
-        if (session->types & sourceMonitor)
-            options["monitors"] = base::dbus::Type<std::vector<Variant>>::toVariant(monitors);
-        if (session->types & sourceWindow)
-            options["windows"] = base::dbus::Type<std::vector<Variant>>::toVariant(windows);
+        const VariantMap options = screenCastSourceOptions(session->types, outputs, wayland->toplevels());
         prompt.append(path, std::string("screen-recording"), session->appId, parentWindow, options);
         // The user answers in their own time.
         prompting = true;
