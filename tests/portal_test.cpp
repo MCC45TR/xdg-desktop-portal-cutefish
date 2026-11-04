@@ -8,6 +8,7 @@
 #include "inhibitportal.h"
 #include "screencastportal.h"
 #include "settingsportal.h"
+#include "waylandcapture.h"
 
 #include "base/dbus.h"
 #include "base/event_loop.h"
@@ -861,6 +862,28 @@ protected:
 
     std::vector<std::string> closed;
 };
+
+TEST(ScreenCastPrompt, ChoicesMatchPermissionDialogContract)
+{
+    const std::vector<CaptureOutput> outputs {
+            {"DP-4", "AOC G2790G4", {0, 0}, {1920, 1080}, 144000},
+            {"DP-6", "AOC 2460G4", {1920, 0}, {1920, 1080}, 144001}};
+    const std::vector<CaptureToplevel> windows {{"42", "Discord", "vesktop"}};
+    const VariantMap options = screenCastSourceOptions(3, outputs, windows);
+    ASSERT_EQ(options.at("monitors").signature(), "aa{sv}");
+    ASSERT_EQ(options.at("windows").signature(), "aa{sv}");
+    const auto monitors = options.at("monitors").value<std::vector<VariantMap>>();
+    const auto choices = options.at("windows").value<std::vector<VariantMap>>();
+    ASSERT_EQ(monitors.size(), 2u);
+    ASSERT_EQ(choices.size(), 1u);
+    EXPECT_EQ(monitors[0].at("name").value<std::string>(), "DP-4");
+    EXPECT_EQ(monitors[1].at("x").value<int32_t>(), 1920);
+    EXPECT_EQ(choices[0].at("identifier").value<std::string>(), "42");
+    const auto monitorOnly = screenCastSourceOptions(1, outputs, windows);
+    EXPECT_FALSE(monitorOnly.contains("windows"));
+    const auto windowOnly = screenCastSourceOptions(2, outputs, windows);
+    EXPECT_FALSE(windowOnly.contains("monitors"));
+}
 
 TEST_F(ScreenCastTest, Properties)
 {

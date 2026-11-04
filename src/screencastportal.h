@@ -5,11 +5,20 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 class PipeWireCore;
 class ScreenCastSession;
 class StartRequest;
 class WaylandCapture;
+
+struct CaptureOutput;
+struct CaptureToplevel;
+
+// The permission dialog consumes arrays of dictionaries (aa{sv}), not av.
+cutefish::base::dbus::VariantMap screenCastSourceOptions(
+        uint32_t types, const std::vector<CaptureOutput> &outputs,
+        const std::vector<CaptureToplevel> &toplevels);
 
 class ScreenCastPortal
 {
